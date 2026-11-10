@@ -3,16 +3,19 @@
   "private": false,
   "version": "0.0.1",
   "type": "module",
-  "main": "./dist/ts-github-backuper.umd.js",
+  "main": "./dist/ts-github-backuper.umd.cjs",
   "module": "./dist/ts-github-backuper.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/ts-github-backuper.js",
-      "require": "./dist/ts-github-backuper.umd.js"
+      "require": "./dist/ts-github-backuper.umd.cjs"
     }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
@@ -20,6 +23,7 @@
     "test": "vitest"
   },
   "devDependencies": {
+    "@types/node": "^26.6.6",
     "jsdom": "^29.1.1",
     "typescript": "^6.0.3",
     "vite": "^8.3.6",
