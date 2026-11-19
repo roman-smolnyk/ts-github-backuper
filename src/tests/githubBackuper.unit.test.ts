@@ -104,7 +104,7 @@ describe("GithubBackuper", () => {
       const mockCommits = [{ sha: "commit_sha_123", commit: { committer: { date: "2026-11-09T23:00:00Z" } } }];
       mockOctokitMethods.repos.listCommits.mockResolvedValue({ data: mockCommits });
 
-      const commit = await backuper.getLastFileCommit("my-repo", "config.json");
+      const commit = await backuper.getLastCommitByFile("my-repo", "config.json");
       expect(commit).toEqual(mockCommits[0]);
     });
 
@@ -113,7 +113,7 @@ describe("GithubBackuper", () => {
         data: [{ sha: "123", commit: { committer: { date: "2026-11-09T23:00:00Z" } } }],
       });
 
-      const date = await backuper.getLastFileCommitDate("my-repo", "config.json");
+      const date = await backuper.getLastCommitDateByFile("my-repo", "config.json");
       expect(date).toBeInstanceOf(Date);
       // Fixed: Added '.000' to match native JavaScript ISO format outputs precisely
       expect(date?.toISOString()).toBe("2026-11-09T23:00:00.000Z");
@@ -124,7 +124,7 @@ describe("GithubBackuper", () => {
         data: [{ sha: "precise_git_sha_xyz" }],
       });
 
-      const sha = await backuper.getLastFileCommitSha("my-repo", "config.json");
+      const sha = await backuper.getLastCommitShaByFile("my-repo", "config.json");
       expect(sha).toBe("precise_git_sha_xyz");
     });
   });
@@ -160,26 +160,26 @@ describe("GithubBackuper", () => {
 
   describe("File Mutations & Upload Lifecycles", () => {
     test("should upload content updates cleanly when optional sha parameters match", async () => {
-      mockOctokitMethods.repos.createOrUpdateFileContents.mockResolvedValue({});
+      mockOctokitMethods.repos.createOrUpdateFileContents.mockResolvedValue({ data: { content: { sha: "SHA" } } });
 
-      const status = await backuper.putFileContent("my-repo", "log.txt", "payload", "old-sha");
-      expect(status).toBe(true);
+      const result = await backuper.putFileContent("my-repo", "log.txt", "payload", { fileSha: "old-sha" });
+      expect(result).toBe("SHA");
     });
 
     test("should force-write changes with latest tracking SHAs using putFileContentForce", async () => {
       mockOctokitMethods.repos.listCommits.mockResolvedValue({ data: [{ sha: "head-branch-sha" }] });
       mockOctokitMethods.repos.createOrUpdateFileContents.mockResolvedValue({});
 
-      const status = await backuper.putFileContentForce("my-repo", "log.txt", "payload");
-      expect(status).toBe(true);
+      const result = await backuper.putFileContent("my-repo", "log.txt", "payload", { force: true });
+      expect(result).toBeTypeOf("string");
     });
 
     test("should convert plain text parameters to base64 prior to a forced upload", async () => {
       mockOctokitMethods.repos.listCommits.mockResolvedValue({ data: [] });
       mockOctokitMethods.repos.createOrUpdateFileContents.mockResolvedValue({});
 
-      const status = await backuper.putFileContentTextForce("my-repo", "notes.md", "hello");
-      expect(status).toBe(true);
+      const result = await backuper.putFileContentText("my-repo", "notes.md", "hello", { force: true });
+      expect(result).toBeTypeOf("string");
       expect(Base64.encode).toHaveBeenCalledWith("hello");
     });
 

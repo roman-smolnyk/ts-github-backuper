@@ -58,7 +58,7 @@ export class GithubBackuper {
     return [];
   }
 
-  async getLastFileCommit(repoName: string, filePath: string) {
+  async getLastCommitByFile(repoName: string, filePath: string) {
     const username = await this.getCachedUsername();
     if (!username) return;
 
@@ -73,14 +73,11 @@ export class GithubBackuper {
         },
       });
       return data[0];
-      // if (!Array.isArray(data) && data.type === "file") {
-      //   return data;
-      // }
     } catch {}
   }
 
-  async getLastFileCommitDate(repoName: string, filePath: string): Promise<Date | undefined> {
-    const commit = await this.getLastFileCommit(repoName, filePath);
+  async getLastCommitDateByFile(repoName: string, filePath: string): Promise<Date | undefined> {
+    const commit = await this.getLastCommitByFile(repoName, filePath);
     if (commit) {
       const dateStr = commit.commit.committer?.date;
       if (dateStr) {
@@ -89,12 +86,11 @@ export class GithubBackuper {
     }
   }
 
-  async getLastFileCommitSha(repoName: string, filePath: string): Promise<string> {
-    // ! It returns the sha of the commit itself, not the file's sha
+  async getLastCommitShaByFile(repoName: string, filePath: string): Promise<string> {
     const username = await this.getCachedUsername();
     if (!username) return "";
 
-    const commit = await this.getLastFileCommit(repoName, filePath);
+    const commit = await this.getLastCommitByFile(repoName, filePath);
 
     if (commit) {
       return commit.sha;
@@ -147,6 +143,34 @@ export class GithubBackuper {
     }
 
     return "";
+  }
+
+  async fileExists(repoName: string, filePath: string): Promise<boolean | undefined> {
+    const username = await this.getCachedUsername();
+    if (!username) return undefined;
+
+    try {
+      const resp = await this.#octokit.repos.getContent({
+        owner: username,
+        repo: repoName,
+        path: filePath,
+        method: "HEAD",
+      });
+
+      // The ETag header for git repository object files matches its Blob SHA
+      const etag = resp.headers.etag;
+      if (etag) {
+        return true;
+      } else {
+        return false;
+      }
+    } catch (error: any) {
+      if (error.status === 404) {
+        return false;
+      }
+    }
+
+    return undefined;
   }
 
   async getFile(repoName: string, filePath: string) {
@@ -226,12 +250,16 @@ export class GithubBackuper {
     return;
   }
 
-  async putFileContent(repoName: string, filePath: string, fileContent: string, fileSha?: string): Promise<boolean> {
+  async putFileContent(repoName: string, filePath: string, fileContent: string, { fileSha, force }: { fileSha?: string; force?: boolean }): Promise<string> {
     const username = await this.getCachedUsername();
-    if (!username) return false;
+    if (!username) return "";
+
+    if (force) {
+      fileSha = await this.getFileSha2(repoName, filePath);
+    }
 
     try {
-      await this.#octokit.repos.createOrUpdateFileContents({
+      const resp = await this.#octokit.repos.createOrUpdateFileContents({
         owner: username,
         repo: repoName,
         path: filePath,
@@ -239,39 +267,30 @@ export class GithubBackuper {
         content: fileContent,
         ...(fileSha && { sha: fileSha }),
       });
-      return true;
+      return resp.data.content?.sha || "";
     } catch (error) {
       console.error(error);
     }
 
-    return false;
+    return "";
   }
 
-  async putFileContentForce(repoName: string, filePath: string, fileContent: string) {
-    const username = await this.getCachedUsername();
-    if (!username) return false;
-
-    const fileSha = await this.getFileSha2(repoName, filePath);
-
-    return await this.putFileContent(repoName, filePath, fileContent, fileSha);
-  }
-
-  async putFileContentTextForce(repoName: string, filePath: string, text: string) {
+  async putFileContentText(repoName: string, filePath: string, text: string, { fileSha, force }: { fileSha?: string; force?: boolean }) {
     const username = await this.getCachedUsername();
     if (!username) return false;
 
     const fileContent = Base64.encode(text);
 
-    return await this.putFileContentForce(repoName, filePath, fileContent);
+    return await this.putFileContent(repoName, filePath, fileContent, { fileSha, force });
   }
 
-  async putFileContentUint8ArrayForce(repoName: string, filePath: string, uint8Array: Uint8Array) {
+  async putFileContentUint8Array(repoName: string, filePath: string, uint8Array: Uint8Array, { fileSha, force }: { fileSha?: string; force?: boolean }) {
     const username = await this.getCachedUsername();
     if (!username) return false;
 
     const fileContent = fromUint8Array(uint8Array);
 
-    return await this.putFileContentForce(repoName, filePath, fileContent);
+    return await this.putFileContent(repoName, filePath, fileContent, { fileSha, force });
   }
 
   async deleteFile(repoName: string, filePath: string): Promise<boolean> {

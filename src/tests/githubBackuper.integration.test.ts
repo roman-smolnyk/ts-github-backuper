@@ -31,14 +31,20 @@ describe("GithubBackuper Integration Test (Live API Lifecycle)", () => {
     const isTokenValid = await backuper.isTokenValid();
     expect(isTokenValid).toBe(true);
 
-    const createSuccess = await backuper.putFileContentTextForce(repoName, testFilePath, initialText);
-    expect(createSuccess).toBe(true);
+    const fileExists = await backuper.fileExists(repoName, testFilePath);
+    expect(fileExists).toBe(false);
+
+    const createSha = await backuper.putFileContentText(repoName, testFilePath, initialText, { force: true });
+    expect(createSha).toMatch(/\S/);
+
+    const fileExists2 = await backuper.fileExists(repoName, testFilePath);
+    expect(fileExists2).toBe(true);
 
     const fetchedText = await backuper.getFileContentText(repoName, testFilePath);
     expect(fetchedText).toBe(initialText);
 
-    const updateSuccess = await backuper.putFileContentTextForce(repoName, testFilePath, updatedText);
-    expect(updateSuccess).toBe(true);
+    const updateSha = await backuper.putFileContentText(repoName, testFilePath, updatedText, { force: true });
+    expect(updateSha).toMatch(/\S/);
 
     const fetchedUpdatedText = await backuper.getFileContentText(repoName, testFilePath);
     expect(fetchedUpdatedText).toBe(updatedText);
