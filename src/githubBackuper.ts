@@ -276,18 +276,12 @@ export class GithubBackuper {
   }
 
   async putFileContentText(repoName: string, filePath: string, text: string, { fileSha, force }: { fileSha?: string; force?: boolean }) {
-    const username = await this.getCachedUsername();
-    if (!username) return false;
-
     const fileContent = Base64.encode(text);
 
     return await this.putFileContent(repoName, filePath, fileContent, { fileSha, force });
   }
 
   async putFileContentUint8Array(repoName: string, filePath: string, uint8Array: Uint8Array, { fileSha, force }: { fileSha?: string; force?: boolean }) {
-    const username = await this.getCachedUsername();
-    if (!username) return false;
-
     const fileContent = fromUint8Array(uint8Array);
 
     return await this.putFileContent(repoName, filePath, fileContent, { fileSha, force });
