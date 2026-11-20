@@ -1,5 +1,10 @@
 import { Octokit } from "@octokit/rest";
-import { Base64, fromUint8Array, toUint8Array } from "js-base64";
+import { Base64 } from "js-base64";
+
+export const textToBase64 = (text: string) => Base64.encode(text);
+export const base64ToText = (base64: string) => Base64.decode(base64);
+export const uint8ArrayToBase64 = (uint8Array: Uint8Array) => Base64.fromUint8Array(uint8Array);
+export const base64ToUint8Array = (base64: string) => Base64.toUint8Array(base64);
 
 export class GithubBackuper {
   #octokit: Octokit;
@@ -194,8 +199,9 @@ export class GithubBackuper {
     }
   }
 
-  async getFileContent(repoName: string, filePath: string): Promise<string> {
-    // return base64 string
+  async getFileContentOld(repoName: string, filePath: string): Promise<string> {
+    // ! Up to 1 Mb
+
     const username = await this.getCachedUsername();
     if (!username) return "";
 
@@ -209,7 +215,8 @@ export class GithubBackuper {
         },
       });
       if (!Array.isArray(data) && data.type === "file") {
-        return data.content.replace(/\s/g, ""); // Strip GitHub's injected line breaks
+        // Strip GitHub's injected line breaks
+        return data.content.replace(/\s/g, ""); // base64
       }
     } catch (error) {
       console.error(error);
@@ -218,39 +225,67 @@ export class GithubBackuper {
     return "";
   }
 
-  async getFileContentText(repoName: string, filePath: string): Promise<string> {
+  async getFileContent(repoName: string, { fileSha = "", filePath }: { fileSha?: string; filePath?: string }): Promise<string> {
+    // ! Up to 100 Mb
+    // filePath causes 2 requests
+
+    if (!fileSha && !filePath) throw new Error(`fileSha or filePath is missing`);
+
     const username = await this.getCachedUsername();
     if (!username) return "";
 
-    const fileContent = await this.getFileContent(repoName, filePath);
-    if (!fileContent) return "";
+    if (!fileSha && filePath) {
+      fileSha = await this.getFileSha2(repoName, filePath);
+    }
 
     try {
-      return Base64.decode(fileContent);
-    } catch (error) {
-      console.error(error);
-    }
+      const { data } = await this.#octokit.git.getBlob({
+        owner: username,
+        repo: repoName,
+        file_sha: fileSha,
+      });
+
+      return data.content.replace(/\s/g, "");
+    } catch (__error) {}
 
     return "";
   }
 
-  async getFileContentUint8Array(repoName: string, filePath: string): Promise<Uint8Array | undefined> {
-    const username = await this.getCachedUsername();
-    if (!username) return;
+  // async getFileContent2(repoName: string, filePath: string): Promise<any> {
+  //   // TODO:
+  //   // ! Up to 100 Mb
+  //   const username = await this.getCachedUsername();
+  //   if (!username) return null;
 
-    const fileContent = await this.getFileContent(repoName, filePath);
-    if (!fileContent) return;
+  //   try {
+  //     const { data } = await this.#octokit.repos.getContent({
+  //       owner: username,
+  //       repo: repoName,
+  //       path: filePath,
+  //       headers: {
+  //         "If-None-Match": "", // Forces GitHub to bypass the cache
+  //       },
+  //     });
+  //     if (!Array.isArray(data) && data.type === "file") {
+  //       if (data.download_url) {
+  //         const res = await fetch(data.download_url);
+  //         if (!res.ok) {
+  //           throw new Error(`Failed to download file: ${res.statusText}`);
+  //         }
+  //         await res.bytes();
+  //         await res.text();
+  //         await res.json();
+  //         await res.blob();
+  //       }
+  //     }
+  //   } catch (error) {
+  //     console.error(error);
+  //   }
 
-    try {
-      return toUint8Array(fileContent);
-    } catch (error) {
-      console.error(error);
-    }
+  //   return null;
+  // }
 
-    return;
-  }
-
-  async putFileContent(repoName: string, filePath: string, fileContent: string, { fileSha, force }: { fileSha?: string; force?: boolean }): Promise<string> {
+  async putFileContent(repoName: string, filePath: string, base64Content: string, { fileSha, force }: { fileSha?: string; force?: boolean }): Promise<string> {
     const username = await this.getCachedUsername();
     if (!username) return "";
 
@@ -264,7 +299,7 @@ export class GithubBackuper {
         repo: repoName,
         path: filePath,
         message: `GithubBackuper`,
-        content: fileContent,
+        content: base64Content,
         ...(fileSha && { sha: fileSha }),
       });
       return resp.data.content?.sha || "";
@@ -273,18 +308,6 @@ export class GithubBackuper {
     }
 
     return "";
-  }
-
-  async putFileContentText(repoName: string, filePath: string, text: string, { fileSha, force }: { fileSha?: string; force?: boolean }) {
-    const fileContent = Base64.encode(text);
-
-    return await this.putFileContent(repoName, filePath, fileContent, { fileSha, force });
-  }
-
-  async putFileContentUint8Array(repoName: string, filePath: string, uint8Array: Uint8Array, { fileSha, force }: { fileSha?: string; force?: boolean }) {
-    const fileContent = fromUint8Array(uint8Array);
-
-    return await this.putFileContent(repoName, filePath, fileContent, { fileSha, force });
   }
 
   async deleteFile(repoName: string, filePath: string): Promise<boolean> {

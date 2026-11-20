@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, test } from "vitest";
-import { GithubBackuper } from "../githubBackuper";
+import { GithubBackuper, textToBase64, base64ToText, uint8ArrayToBase64, base64ToUint8Array } from "../githubBackuper";
 
 describe("GithubBackuper Integration Test (Live API Lifecycle)", () => {
   let backuper: GithubBackuper;
@@ -34,25 +34,25 @@ describe("GithubBackuper Integration Test (Live API Lifecycle)", () => {
     const fileExists = await backuper.fileExists(repoName, testFilePath);
     expect(fileExists).toBe(false);
 
-    const createSha = await backuper.putFileContentText(repoName, testFilePath, initialText, { force: true });
+    const createSha = await backuper.putFileContent(repoName, testFilePath, textToBase64(initialText), { force: true });
     expect(createSha).toMatch(/\S/);
 
     const fileExists2 = await backuper.fileExists(repoName, testFilePath);
     expect(fileExists2).toBe(true);
 
-    const fetchedText = await backuper.getFileContentText(repoName, testFilePath);
+    const fetchedText = base64ToText(await backuper.getFileContent(repoName, { filePath: testFilePath }));
     expect(fetchedText).toBe(initialText);
 
-    const updateSha = await backuper.putFileContentText(repoName, testFilePath, updatedText, { force: true });
+    const updateSha = await backuper.putFileContent(repoName, testFilePath, textToBase64(updatedText), { force: true });
     expect(updateSha).toMatch(/\S/);
 
-    const fetchedUpdatedText = await backuper.getFileContentText(repoName, testFilePath);
+    const fetchedUpdatedText = base64ToText(await backuper.getFileContent(repoName, { filePath: testFilePath }));
     expect(fetchedUpdatedText).toBe(updatedText);
 
     const deleteSuccess = await backuper.deleteFile(repoName, testFilePath);
     expect(deleteSuccess).toBe(true);
 
-    const postDeleteText = await backuper.getFileContentText(repoName, testFilePath);
+    const postDeleteText = await backuper.getFileContent(repoName, { filePath: testFilePath });
     expect(postDeleteText).toBe("");
   });
 });
