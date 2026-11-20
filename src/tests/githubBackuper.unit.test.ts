@@ -135,7 +135,7 @@ describe("GithubBackuper", () => {
         data: { type: "file", content: "YmFz\nZTY0\nZGF0\nYQ==\n" },
       });
 
-      const content = await backuper.getFileContent("my-repo", "file.txt");
+      const content = await backuper.getFileContent("my-repo", { filePath: "file.txt" });
       expect(content).toBe("YmFzZTY0ZGF0YQ==");
     });
 
@@ -144,7 +144,7 @@ describe("GithubBackuper", () => {
         data: { type: "file", content: "YmFzZTY0" },
       });
 
-      const text = await backuper.getFileContentText("my-repo", "file.txt");
+      const text = await backuper.getFileContent("my-repo", { filePath: "file.txt" });
       expect(text).toBe("decoded:YmFzZTY0");
     });
 
@@ -153,7 +153,7 @@ describe("GithubBackuper", () => {
         data: { type: "file", content: "YmFzZTY0" },
       });
 
-      const array = await backuper.getFileContentUint8Array("my-repo", "file.bin");
+      const array = await backuper.getFileContent("my-repo", { filePath: "file.bin" });
       expect(array).toBeInstanceOf(Uint8Array);
     });
   });
@@ -178,7 +178,7 @@ describe("GithubBackuper", () => {
       mockOctokitMethods.repos.listCommits.mockResolvedValue({ data: [] });
       mockOctokitMethods.repos.createOrUpdateFileContents.mockResolvedValue({});
 
-      const result = await backuper.putFileContentText("my-repo", "notes.md", "hello", { force: true });
+      const result = await backuper.putFileContent("my-repo", "notes.md", "hello", { force: true });
       expect(result).toBeTypeOf("string");
       expect(Base64.encode).toHaveBeenCalledWith("hello");
     });

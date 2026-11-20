@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, test } from "vitest";
-import { GithubBackuper, textToBase64, base64ToText, uint8ArrayToBase64, base64ToUint8Array } from "../githubBackuper";
+import { GithubBackuper, textToBase64, base64ToText } from "../githubBackuper";
 
 describe("GithubBackuper Integration Test (Live API Lifecycle)", () => {
   let backuper: GithubBackuper;
