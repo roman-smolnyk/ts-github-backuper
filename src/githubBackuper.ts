@@ -7,24 +7,24 @@ export const uint8ArrayToBase64 = (uint8Array: Uint8Array) => Base64.fromUint8Ar
 export const base64ToUint8Array = (base64: string) => Base64.toUint8Array(base64);
 
 export class GithubBackuper {
-  #octokit: Octokit;
-  #cachedUsername: string | null = null;
+  octokit: Octokit;
+  cachedUsername: string | null = null;
 
   constructor(token: string) {
-    this.#octokit = new Octokit({ auth: token });
+    this.octokit = new Octokit({ auth: token });
   }
 
   async getUsername(): Promise<string | undefined> {
     try {
-      const { data: user } = await this.#octokit.rest.users.getAuthenticated();
-      return user.login;
+      const { data } = await this.octokit.rest.users.getAuthenticated();
+      return data.login;
     } catch {}
   }
 
   async getCachedUsername(): Promise<string> {
-    if (this.#cachedUsername) return this.#cachedUsername;
-    this.#cachedUsername = (await this.getUsername()) || "";
-    return this.#cachedUsername;
+    if (this.cachedUsername) return this.cachedUsername;
+    this.cachedUsername = (await this.getUsername()) || "";
+    return this.cachedUsername;
   }
 
   async isTokenValid() {
@@ -37,7 +37,7 @@ export class GithubBackuper {
       //   per_page: 100,
       //   page: 1,
       // });
-      const repos = await this.#octokit.paginate(this.#octokit.rest.repos.listForAuthenticatedUser, {
+      const repos = await this.octokit.paginate(this.octokit.rest.repos.listForAuthenticatedUser, {
         visibility: "private", // 'all', 'public', 'private'
         affiliation: "owner",
       });
@@ -51,7 +51,7 @@ export class GithubBackuper {
     if (!username) return [];
 
     try {
-      const { data } = await this.#octokit.repos.getContent({
+      const { data } = await this.octokit.repos.getContent({
         owner: username,
         repo: repoName,
         path: "",
@@ -68,7 +68,7 @@ export class GithubBackuper {
     if (!username) return;
 
     try {
-      const { data } = await this.#octokit.repos.listCommits({
+      const { data } = await this.octokit.repos.listCommits({
         owner: username,
         repo: repoName,
         path: filePath,
@@ -109,7 +109,7 @@ export class GithubBackuper {
     if (!username) return "";
 
     try {
-      const resp = await this.#octokit.repos.getContent({
+      const resp = await this.octokit.repos.getContent({
         owner: username,
         repo: repoName,
         path: filePath,
@@ -130,7 +130,7 @@ export class GithubBackuper {
     if (!username) return "";
 
     try {
-      const resp = await this.#octokit.repos.getContent({
+      const resp = await this.octokit.repos.getContent({
         owner: username,
         repo: repoName,
         path: filePath,
@@ -155,7 +155,7 @@ export class GithubBackuper {
     if (!username) return undefined;
 
     try {
-      const resp = await this.#octokit.repos.getContent({
+      const resp = await this.octokit.repos.getContent({
         owner: username,
         repo: repoName,
         path: filePath,
@@ -183,7 +183,7 @@ export class GithubBackuper {
     if (!username) return;
 
     try {
-      const { data } = await this.#octokit.repos.getContent({
+      const { data } = await this.octokit.repos.getContent({
         owner: username,
         repo: repoName,
         path: filePath,
@@ -206,7 +206,7 @@ export class GithubBackuper {
     if (!username) return "";
 
     try {
-      const { data } = await this.#octokit.repos.getContent({
+      const { data } = await this.octokit.repos.getContent({
         owner: username,
         repo: repoName,
         path: filePath,
@@ -239,7 +239,7 @@ export class GithubBackuper {
     }
 
     try {
-      const { data } = await this.#octokit.git.getBlob({
+      const { data } = await this.octokit.git.getBlob({
         owner: username,
         repo: repoName,
         file_sha: fileSha,
@@ -294,7 +294,7 @@ export class GithubBackuper {
     }
 
     try {
-      const resp = await this.#octokit.repos.createOrUpdateFileContents({
+      const resp = await this.octokit.repos.createOrUpdateFileContents({
         owner: username,
         repo: repoName,
         path: filePath,
@@ -315,7 +315,7 @@ export class GithubBackuper {
     if (!username) return false;
 
     try {
-      const { data } = await this.#octokit.repos.getContent({
+      const { data } = await this.octokit.repos.getContent({
         owner: username,
         repo: repoName,
         path: filePath,
@@ -325,7 +325,7 @@ export class GithubBackuper {
         return false;
       }
 
-      await this.#octokit.repos.deleteFile({
+      await this.octokit.repos.deleteFile({
         owner: username,
         repo: repoName,
         path: filePath,
@@ -341,30 +341,21 @@ export class GithubBackuper {
     return false;
   }
 
-  // async getLargeFileInBrowser(repoName: string, filePath: string): Promise<Blob | undefined> {
-  //   const username = await this.getCachedUsername();
-  //   if (!username) return;
+  async getRepoSize(repoName: string): Promise<number> {
+    const username = await this.getCachedUsername();
+    if (!username) return -1;
 
-  //   try {
-  //     // 1. Get the file metadata to find the raw download URL
-  //     const fileMetadata = await this.getFile(repoName, filePath);
-  //     if (!fileMetadata || Array.isArray(fileMetadata)) return;
+    try {
+      const { data } = await this.octokit.rest.repos.get({
+        owner: username,
+        repo: repoName,
+      });
 
-  //     // 2. Use native browser fetch with the raw Git media type header
-  //     const response = await fetch(fileMetadata.download_url, {
-  //       headers: {
-  //         // Authenticating via standard Bearer token for the raw URL
-  //         Authorization: `Bearer ${this.#token}`,
-  //         Accept: "application/vnd.github.v3.raw",
-  //       },
-  //     });
+      const sizeInKB = data.size;
+      const sizeInMB = sizeInKB / 1024;
+      return sizeInMB;
+    } catch (__error) {}
 
-  //     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-  //     // 3. Return a pure browser Blob stream instead of a giant memory string
-  //     return await response.blob();
-  //   } catch (error) {
-  //     console.error("Failed downloading large file in browser context:", error);
-  //   }
-  // }
+    return -1;
+  }
 }
